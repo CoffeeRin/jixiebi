@@ -1,0 +1,85 @@
+#include <ESP8266WiFi.h> //WiFi库
+#include <WiFiUdp.h>    
+#include <Servo.h>       //舵机库
+
+// WiFi信息
+const char* ssid = "esp8266";     //WiFi名
+const char* password = "12345678";//WiFi密码
+
+// 舵机引脚
+const int servoPin1 = D5; // 舵机1连接到引脚D5，右臂
+const int servoPin2 = D6; // 舵机2连接到引脚D6，左臂
+const int servoPin3 = D7; // 舵机3连接到引脚D7，爪子
+const int servoPin4 = D8; // 舵机4连接到引脚D8，底盘
+
+WiFiUDP udp;
+Servo servo1;
+Servo servo2;
+Servo servo3;
+Servo servo4;
+
+//初始化
+void setup() {
+  Serial.begin(115200); //设置串口波特率
+
+  // 创建AP
+  WiFi.mode(WIFI_AP);   //设置为AP模式
+  WiFi.softAP(ssid, password);
+  Serial.println("AP模式已启动");
+
+  // 设置舵机引脚
+  servo1.attach(servoPin1);
+  servo2.attach(servoPin2);
+  servo3.attach(servoPin3);
+  servo4.attach(servoPin4);
+
+  // 初始化舵机角度
+  servo1.write(120);
+  servo2.write(120);
+  servo3.write(0);
+  servo4.write(90);
+
+  // 启动UDP服务
+  udp.begin(1234); // 选择1234为端口号
+}
+
+void loop() {
+  // 接收数据
+  int16_t ax, ay, az;       //接收mpu6050的加速度数据
+  if (udp.parsePacket()) {
+    udp.read((uint8_t*)&ax, sizeof(ax));
+    udp.read((uint8_t*)&ay, sizeof(ay));
+    udp.read((uint8_t*)&az, sizeof(az));
+
+    // 控制舵机
+    controlServo(ax, ay, az);
+    delay(100); // 等待一段时间，稳定输出
+  }
+}
+
+void controlServo(int16_t ax, int16_t ay, int16_t az) {
+  // 根据接收到的数据控制舵机
+  // 将加速度数据映射到舵机角度范围内
+  int servoAngle = map(ay, -16384, 16383, 0, 180);//左右臂
+  int servo2Angle = map(ay, -16384, 16383, 0, 180); // 限制在0到180度之间
+  int servo3Angle = map(az, -16384, 16383, 0, 30);//爪子
+  int servo4Angle = map(ax, -16384, 16383, 0, 180);//底座
+
+  // 限制舵机角度范围在0到180度之间
+  servoAngle = constrain(servoAngle, 0, 180);
+  servo2Angle = constrain(servo2Angle, 0, 180);
+  servo3Angle = constrain(servo3Angle, 0, 30);
+  servo4Angle = constrain(servo4Angle, 0, 180);
+
+  // 控制舵机角度
+  servo1.write(180-servoAngle);
+  servo2.write(180-servo2Angle);
+  servo3.write(servo3Angle);
+  servo4.write(servo4Angle);
+
+  // 打印调试信息
+  Serial.print("Servo Angle: "); Serial.println(servoAngle);
+  Serial.print(" Servo2 Angle: "); Serial.println(servo2Angle);
+  Serial.print(" Servo3 Angle: "); Serial.println(servo3Angle);
+  Serial.print(" Servo4 Angle: "); Serial.println(servo4Angle);
+}

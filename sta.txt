@@ -3,7 +3,6 @@
 #include <ESP8266WiFi.h>
 #include <MPU6050.h>
 
-//
 MPU6050 mpu;
 
 // WiFi的相关信息
